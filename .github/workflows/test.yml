@@ -1,0 +1,76 @@
+name: Test and Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test, lint, and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Check build output
+        run: |
+          if [ -d "dist" ]; then
+            echo "✅ Build output exists"
+            ls -la dist/
+          else
+            echo "❌ No dist/ folder produced by build"
+            exit 1
+          fi
+
+  package:
+    name: Package extension zip
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Create extension zip
+        run: cd dist && zip -r ../privacypilot-${{ github.sha }}.zip . && cd ..
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacypilot-extension
+          path: privacypilot-*.zip
+          retention-days: 30
